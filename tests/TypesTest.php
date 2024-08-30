@@ -7,6 +7,7 @@ namespace GoetasWebservices\XML\XSDReader\Tests;
 use GoetasWebservices\XML\XSDReader\Schema\Attribute\Attribute;
 use GoetasWebservices\XML\XSDReader\Schema\Attribute\AttributeItem;
 use GoetasWebservices\XML\XSDReader\Schema\Attribute\Group as AttributeGroup;
+use GoetasWebservices\XML\XSDReader\Schema\Element\Choice;
 use GoetasWebservices\XML\XSDReader\Schema\Element\Element;
 use GoetasWebservices\XML\XSDReader\Schema\Element\ElementItem;
 use GoetasWebservices\XML\XSDReader\Schema\Element\Group as ElementGroup;
@@ -215,13 +216,13 @@ class TypesTest extends BaseTest
     public function getMaxOccurencesOverride(): array
     {
         return [
-            ['0', '5', 5], // maxOccurs=0 is ignored
+            ['0', '5', 5],
             ['1', '5', 5],
-            ['2', '5', 2], // 2 in this case just means "many"
-            ['4', '5', 4],
+            ['2', '5', 5],
+            ['4', '5', 5],
             ['6', '5', 6],
-            ['unbounded', '5', 5],
-            ['5', 'unbounded', 5],
+            ['unbounded', '5', -1],
+            ['5', 'unbounded', -1],
         ];
     }
 
@@ -231,6 +232,37 @@ class TypesTest extends BaseTest
             ['1', 1],
             ['0', 0],
         ];
+    }
+
+    public function testNestedSequenceChoiceOccurs(): void
+    {
+        $schema = $this->reader->readString(
+            '
+            <xs:schema targetNamespace="http://www.example.com" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+                <xs:complexType name="complexType">
+                    <xs:sequence maxOccurs="unbounded">
+                        <xs:choice>
+                            <xs:element name="el1" type="xs:string"></xs:element>
+                        </xs:choice>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:schema>'
+        );
+
+        $complex = $schema->findType('complexType', 'http://www.example.com');
+        self::assertInstanceOf(ComplexType::class, $complex);
+
+        $elements = $complex->getElements();
+        $choice = $elements[0];
+        self::assertInstanceOf(Choice::class, $choice);
+        self::assertEquals(1, $choice->getMax());
+
+
+        $choiceElements = $choice->getElements();
+        $el1 = $choiceElements[0];
+
+        self::assertInstanceOf(Element::class, $el1);
+        self::assertEquals(-1, $el1->getMax());
     }
 
     /**
